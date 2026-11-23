@@ -28,7 +28,7 @@ void salvar_pessoas(struct no_pessoa *lista_pessoas, const char *nome_arquivo) {
         return;
     }
     struct no_pessoa *atual = lista_pessoas;
-    while (atual != NULL) {
+    while (atual) {
         fwrite(atual->dadosDaPessoa, sizeof(struct pessoa ), 1, arquivo);
         atual = atual->prox;
     }

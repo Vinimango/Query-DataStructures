@@ -1,6 +1,6 @@
 #ifndef TIPO_PET_H
 #define TIPO_PET_H
-#endif
+
 
 
 struct tipo_pet {
@@ -25,3 +25,4 @@ int inserir_tipo_pet(struct no_tipo_pet **lista_tipos_pet, struct tipo_pet *dado
 int alterar_tipo_pet(struct no_tipo_pet **lista_tipos_pet, int codigo, const char *novo_nome);
 
 int remover_tipo_pet(struct no_tipo_pet **lista_tipos_pet, int codigo);
+#endif

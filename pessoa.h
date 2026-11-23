@@ -1,6 +1,6 @@
-#ifdef PESSOA_H
+#ifndef PESSOA_H
 #define PESSOA_H
-#endif
+
 
 struct pessoa {
     int codigo;
@@ -28,3 +28,5 @@ int inserir_pessoas(struct no_pessoa **lista_pessoas, struct pessoa *dadosPessoa
 int alterar_pessoa(struct no_pessoa **lista_pessoa, int codigo, struct pessoa *dadosPessoa);
 
 int remover_pessoa(struct no_pessoa **lista_pessoa, int codigo);
+
+#endif
