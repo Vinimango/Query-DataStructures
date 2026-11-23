@@ -6,8 +6,8 @@ struct pessoa {
     int codigo;
     char nome[100];
     char endereco[100];
-    char telefone[10];
-    char data_nascimento[10];
+    char telefone[15];
+    char data_nascimento[15];
 };
 
 struct no_pessoa {
