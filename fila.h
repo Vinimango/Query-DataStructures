@@ -27,23 +27,4 @@ void liberar_fila(struct fila *f);
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #endif
