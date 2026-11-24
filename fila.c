@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-void inicializarFila (struct cabeca *c) {
+void inicializar (struct cabeca *c) {
     if (c != NULL) {
         c->comeco = NULL;
         c->fim = NULL;
@@ -11,11 +11,9 @@ void inicializarFila (struct cabeca *c) {
 }
 
 int fila_vazia(struct cabeca *c) {
-    if (c->comeco == NULL) {
-        printf("Fila esta vazia\n");
+    if (c == NULL || c->comeco == NULL) {
         return 1;
     }
-    printf("Fila não esta vazia\n");
     return 0;
 }
 
