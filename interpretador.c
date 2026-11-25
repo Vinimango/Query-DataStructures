@@ -34,6 +34,21 @@ static void minusculo(char *dst, const char *src, size_t n) {
     dst[i] = '\0';
 }
 
+/* troca aspas curvas UTF-8 (comuns ao copiar de PDF/Word) por ' */
+static void normalizar_aspas(char *s) {
+    char *w = s;
+    for (char *r = s; *r; r++) {
+        unsigned char *u = (unsigned char *) r;
+        if (u[0] == 0xE2 && u[1] == 0x80 && (u[2] == 0x98 || u[2] == 0x99 || u[2] == 0x9C || u[2] == 0x9D)) {
+            *w++ = '\'';
+            r += 2;
+        } else {
+            *w++ = *r;
+        }
+    }
+    *w = '\0';
+}
+
 /* remove espacos nas pontas e aspas em volta */
 static void aparar(char *s) {
     char *ini = s;
@@ -104,6 +119,7 @@ static int obter_codigo_where(const char *l, int *codigo) {
 int validar_comando(const char *descricao_comando) {
     char l[sizeof(((struct comando *) 0)->descricao)];
     minusculo(l, descricao_comando, sizeof l);
+    normalizar_aspas(l);
     enum op op = obter_op(l);
     int codigo;
     if (op == OP_INVALIDO || obter_tabela(l, op) == T_INVALIDA) return 0;
@@ -123,21 +139,22 @@ static int aplicar_campo(enum tabela t, void *reg, const char *campo, const char
     if (t == T_TIPO_PET) {
         struct tipo_pet *r = reg;
         if (!strcmp(c, "codigo")) r->codigo = atoi(v);
-        else if (!strcmp(c, "nome")) snprintf(r->nome, sizeof r->nome, "%s", v);
+        else if (!strcmp(c, "nome") || !strcmp(c, "descricao")) snprintf(r->nome, sizeof r->nome, "%s", v);
         else return 0;
     } else if (t == T_PESSOA) {
         struct pessoa *r = reg;
         if (!strcmp(c, "codigo")) r->codigo = atoi(v);
         else if (!strcmp(c, "nome")) snprintf(r->nome, sizeof r->nome, "%s", v);
         else if (!strcmp(c, "endereco")) snprintf(r->endereco, sizeof r->endereco, "%s", v);
-        else if (!strcmp(c, "telefone")) snprintf(r->telefone, sizeof r->telefone, "%s", v);
+        else if (!strcmp(c, "telefone") || !strcmp(c, "fone")) snprintf(r->telefone, sizeof r->telefone, "%s", v);
         else if (!strcmp(c, "data_nascimento")) snprintf(r->data_nascimento, sizeof r->data_nascimento, "%s", v);
         else return 0;
     } else {
         struct pet *r = reg;
         if (!strcmp(c, "codigo")) r->codigo = atoi(v);
-        else if (!strcmp(c, "codigo_pessoa")) r->codigo_pessoa = atoi(v);
-        else if (!strcmp(c, "codigo_tipo_pet")) r->codigo_tipo_pet = atoi(v);
+        else if (!strcmp(c, "codigo_pessoa") || !strcmp(c, "codigo_pes") || !strcmp(c, "codigo_cli") || !strcmp(c, "codigo_pet"))
+            r->codigo_pessoa = atoi(v);
+        else if (!strcmp(c, "codigo_tipo_pet") || !strcmp(c, "codigo_tipo")) r->codigo_tipo_pet = atoi(v);
         else if (!strcmp(c, "nome")) snprintf(r->nome, sizeof r->nome, "%s", v);
         else return 0;
     }
@@ -195,11 +212,20 @@ static void executar_insert(const char *orig, const char *l, enum tabela t, stru
     struct pessoa pe = {0};
     struct pet pt = {0};
     void *reg = t == T_TIPO_PET ? (void *) &tp : t == T_PESSOA ? (void *) &pe : (void *) &pt;
+    int tem_codigo = 0;
     for (int i = 0; i < nc; i++) {
         if (!aplicar_campo(t, reg, colunas[i], valores[i])) {
             printf("Erro: coluna '%s' nao existe em %s.\n", colunas[i], nomes_tabela[t]);
             return;
         }
+        char c[TAM];
+        minusculo(c, colunas[i], sizeof c);
+        tem_codigo |= !strcmp(c, "codigo");
+    }
+    const char *nome = t == T_TIPO_PET ? tp.nome : t == T_PESSOA ? pe.nome : pt.nome;
+    if (!tem_codigo || !nome[0]) {
+        printf("Erro: codigo e nome sao obrigatorios.\n");
+        return;
     }
     int ok = t == T_TIPO_PET ? inserir_tipo_pet(b->tipos, &tp)
            : t == T_PESSOA   ? inserir_pessoas(b->pessoas, &pe)
@@ -287,7 +313,9 @@ static void executar_select(const char *l, enum tabela t, struct bancos *b) {
     void (*imprimir)(void *) = t == T_TIPO_PET ? imprimir_tipo_pet : t == T_PESSOA ? imprimir_pessoa : imprimir_pet;
     int codigo;
 
-    if (obter_codigo_where(l, &codigo)) {
+    int filtrar = obter_codigo_where(l, &codigo);
+    int ordenar = strstr(l, " order by ") != NULL;
+    if (filtrar && !ordenar) {
         void *reg = NULL;
         if (t == T_TIPO_PET) { struct no_tipo_pet *n = buscar_tipo_pet(*b->tipos, codigo); if (n) reg = n->dadosDoTipoPet; }
         else if (t == T_PESSOA) { struct no_pessoa *n = buscar_pessoa(*b->pessoas, codigo); if (n) reg = n->dadosDaPessoa; }
@@ -303,6 +331,7 @@ static void executar_select(const char *l, enum tabela t, struct bancos *b) {
     char chave[100];
 #define VISITAR(reg, cod, nome)                                          \
     do {                                                                 \
+        if (filtrar && (cod) != codigo) break;                         \
         if (por_nome) snprintf(chave, sizeof chave, "%s", nome);         \
         else snprintf(chave, sizeof chave, "%011d", (cod) + 1000000000); \
         raiz = inserir_na_arvore(raiz, chave, reg);                      \
@@ -324,6 +353,7 @@ static void executar_select(const char *l, enum tabela t, struct bancos *b) {
 static void executar_comando(const char *cmd, struct bancos *b) {
     char orig[sizeof(((struct comando *) 0)->descricao)], l[sizeof orig];
     snprintf(orig, sizeof orig, "%s", cmd);
+    normalizar_aspas(orig);
     minusculo(l, orig, sizeof l);
     enum op op = obter_op(l);
     enum tabela t = obter_tabela(l, op);
