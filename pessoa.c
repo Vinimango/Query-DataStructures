@@ -43,7 +43,6 @@ struct no_pessoa *buscar_pessoa(struct no_pessoa *lista_pessoas, int codigo) {
         aux = aux->prox;
     }
     if (!aux) {
-        printf("Não foi possivel encontrar uma pessoa com este código!\n");
         return NULL;
     }
     return aux;

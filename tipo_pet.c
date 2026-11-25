@@ -28,7 +28,7 @@ void salvar_tipos_pet(struct no_tipo_pet *lista, const char *nome_arquivo) {
     FILE *arquivo = fopen(nome_arquivo, "wb");
 
     if (arquivo == NULL) {
-        printf(("Erro ao abrir o arquivo %s\n", nome_arquivo));
+        printf("Erro ao abrir o arquivo %s\n", nome_arquivo);
         return;
     }
     struct no_tipo_pet *atual = lista;
@@ -41,14 +41,13 @@ void salvar_tipos_pet(struct no_tipo_pet *lista, const char *nome_arquivo) {
 }
 
 
-struct no_tipo_pet *busca_tipo_pet (struct no_tipo_pet *lista, int codigo) {
+struct no_tipo_pet *buscar_tipo_pet (struct no_tipo_pet *lista, int codigo) {
 
     struct no_tipo_pet *aux= lista;
     while (aux && aux->dadosDoTipoPet->codigo != codigo) {
         aux = aux->prox;
     }
     if (!aux) {
-        printf("Nao foi possivel encotrar um tipo de pet com esse código!\n");
         return NULL;
     }
     return aux;
@@ -56,7 +55,7 @@ struct no_tipo_pet *busca_tipo_pet (struct no_tipo_pet *lista, int codigo) {
 
 int inserir_tipo_pet(struct no_tipo_pet **lista, struct tipo_pet *pet) {
 
-    if (busca_tipo_pet(*lista, pet->codigo) != NULL) {
+    if (buscar_tipo_pet(*lista, pet->codigo) != NULL) {
         printf("Erro: Codigo %d ja cadastrado!\n", pet->codigo);
         return 0;
     }
@@ -95,7 +94,7 @@ int alterar_tipo_pet(struct no_tipo_pet **lista, int codigo,const char *novo_nom
     return 1;
 }
 
-int deletar_tipo_pet(struct no_tipo_pet **lista, int codigo) {
+int remover_tipo_pet(struct no_tipo_pet **lista, int codigo) {
     struct no_tipo_pet *aux = *lista;
     while (aux && aux->dadosDoTipoPet->codigo != codigo) {
         aux = aux->prox;

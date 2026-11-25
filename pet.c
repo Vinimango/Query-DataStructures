@@ -42,7 +42,6 @@ struct no_pet *buscar_pet(struct no_pet *listaPets, int codigo) {
         aux = aux->prox;
     }
     if (!aux) {
-        printf("Não foi possivel encontrar um pet com esse codigo!\n");
         return NULL;
     }
     return aux;

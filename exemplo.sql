@@ -1,0 +1,10 @@
+INSERT INTO tipo_pet VALUES (1, 'Cachorro');
+INSERT INTO tipo_pet (codigo, nome) VALUES (2, 'Gato');
+INSERT INTO pessoa (codigo, nome, telefone) VALUES (1, 'Zeca', '1199');
+INSERT INTO pessoa VALUES (2, 'Ana', 'Rua A; 10', '1188', '01/01/2000');
+INSERT INTO pet VALUES (1, 2, 1, 'Rex');
+INSERT INTO pet VALUES (2, 9, 1, 'Sem dono');
+UPDATE pessoa SET telefone = '1177' WHERE codigo = 1;
+DELETE FROM pessoa WHERE codigo = 2;
+SELECT * FROM pessoa ORDER BY nome;
+SELECT * FROM pet WHERE codigo = 1;

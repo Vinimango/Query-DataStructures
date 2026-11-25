@@ -1,4 +1,4 @@
-#indef ARVORE_H
+#ifndef ARVORE_H
 #define ARVORE_H
 
 struct no_arvore {
