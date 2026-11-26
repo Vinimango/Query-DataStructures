@@ -19,13 +19,19 @@ static const char *colunas_padrao[3][MAX_CAMPOS] = {
 };
 static const int qtd_colunas[] = {2, 5, 4};
 
+struct bancos {
+    struct no_tipo_pet **tipos;
+    struct no_pessoa **pessoas;
+    struct no_pet **pets;
+};
+
+
 static void minusculo(char *dst, const char *src, size_t n) {
     size_t i;
     for (i = 0; i + 1 < n && src[i]; i++) dst[i] = (char) tolower((unsigned char) src[i]);
     dst[i] = '\0';
 }
 
-/* troca aspas curvas UTF-8 (comuns ao copiar de PDF/Word) por ' */
 static void normalizar_aspas(char *s) {
     char *w = s;
     for (char *r = s; *r; r++) {
@@ -40,6 +46,7 @@ static void normalizar_aspas(char *s) {
     *w = '\0';
 }
 
+
 static void aparar(char *s) {
     char *ini = s;
     while (isspace((unsigned char) *ini)) ini++;
@@ -53,6 +60,7 @@ static void aparar(char *s) {
     s[n] = '\0';
 }
 
+/* divide s[0..len) por virgulas fora de aspas */
 static int separar_lista(const char *s, size_t len, char out[][TAM], int max) {
     int k = 0;
     size_t j = 0;
@@ -74,6 +82,7 @@ static int separar_lista(const char *s, size_t len, char out[][TAM], int max) {
     }
     return k;
 }
+
 
 static enum op obter_op(const char *l) {
     while (isspace((unsigned char) *l)) l++;
@@ -100,7 +109,13 @@ static enum tabela obter_tabela(const char *l, enum op op) {
 
 static int obter_codigo_where(const char *l, int *codigo) {
     const char *w = strstr(l, " where ");
-    if (!w || !(w = strstr(w, "codigo")) || !(w = strchr(w, '='))) return 0;
+    if (!w) return 0;
+    w += 7;
+    while (isspace((unsigned char) *w)) w++;
+    if (strncmp(w, "codigo", 6) != 0) return 0;
+    w += 6;
+    while (isspace((unsigned char) *w)) w++;
+    if (*w != '=') return 0;
     *codigo = atoi(w + 1);
     return 1;
 }
@@ -116,7 +131,7 @@ int validar_comando(const char *descricao_comando) {
         case OP_INSERT: return strstr(l, "values") && strchr(l, '(') && strchr(l, ')');
         case OP_UPDATE: return strstr(l, " set ") && obter_codigo_where(l, &codigo);
         case OP_DELETE: return obter_codigo_where(l, &codigo);
-        default: return 1;
+        default: return !strstr(l, " where ") || obter_codigo_where(l, &codigo); /* select so filtra por codigo */
     }
 }
 
@@ -149,29 +164,87 @@ static int aplicar_campo(enum tabela t, void *reg, const char *campo, const char
     return 1;
 }
 
+
+struct coluna { const char *titulo; int largura; };
+
+static const struct coluna colunas_saida[3][5] = {
+    {{"codigo", 6}, {"nome", 20}},
+    {{"codigo", 6}, {"nome", 20}, {"fone", 14}, {"nascimento", 10}, {"endereco", 25}},
+    {{"codigo", 6}, {"nome", 20}, {"dono", 20}, {"tipo", 15}},
+};
+static const int qtd_colunas_saida[] = {2, 5, 4};
+
+static struct bancos *bancos_atual;
+static int linhas_impressas;
+
+static void celula(const char *s, int largura) {
+    int extra = 0;
+    for (const unsigned char *p = (const unsigned char *) s; *p; p++)
+        if ((*p & 0xC0) == 0x80) extra++;
+    printf("%-*s  ", largura + extra, s);
+}
+
+static void celula_int(int v, int largura) {
+    char buf[16];
+    snprintf(buf, sizeof buf, "%d", v);
+    celula(buf, largura);
+}
+
+static void imprimir_cabecalho(enum tabela t) {
+    linhas_impressas = 0;
+    for (int i = 0; i < qtd_colunas_saida[t]; i++) celula(colunas_saida[t][i].titulo, colunas_saida[t][i].largura);
+    printf("\n");
+    for (int i = 0; i < qtd_colunas_saida[t]; i++) {
+        for (int j = 0; j < colunas_saida[t][i].largura; j++) putchar('-');
+        printf("  ");
+    }
+    printf("\n");
+}
+
+static void imprimir_rodape(void) {
+    if (linhas_impressas == 0) printf("(nenhum registro)\n");
+    else printf("(%d registro%s)\n", linhas_impressas, linhas_impressas > 1 ? "s" : "");
+}
+
 static void imprimir_tipo_pet(void *r) {
     struct tipo_pet *t = r;
-    printf("%d | %s\n", t->codigo, t->nome);
+    celula_int(t->codigo, 6);
+    celula(t->nome, 20);
+    printf("\n");
+    linhas_impressas++;
 }
 
 static void imprimir_pessoa(void *r) {
     struct pessoa *p = r;
-    printf("%d | %s | %s | %s | %s\n", p->codigo, p->nome, p->endereco, p->telefone, p->data_nascimento);
+    celula_int(p->codigo, 6);
+    celula(p->nome, 20);
+    celula(p->telefone, 14);
+    celula(p->data_nascimento, 10);
+    celula(p->endereco, 25);
+    printf("\n");
+    linhas_impressas++;
 }
 
 static void imprimir_pet(void *r) {
     struct pet *p = r;
-    printf("%d | %s | pessoa %d | tipo %d\n", p->codigo, p->nome, p->codigo_pessoa, p->codigo_tipo_pet);
+    struct no_pessoa *dono = buscar_pessoa(*bancos_atual->pessoas, p->codigo_pessoa);
+    struct no_tipo_pet *tipo = buscar_tipo_pet(*bancos_atual->tipos, p->codigo_tipo_pet);
+    celula_int(p->codigo, 6);
+    celula(p->nome, 20);
+    celula(dono ? dono->dadosDaPessoa->nome : "?", 20);
+    celula(tipo ? tipo->dadosDoTipoPet->nome : "?", 15);
+    printf("\n");
+    linhas_impressas++;
 }
 
 
-struct bancos {
-    struct no_tipo_pet **tipos;
-    struct no_pessoa **pessoas;
-    struct no_pet **pets;
-};
+static int existe(enum tabela t, int codigo, struct bancos *b) {
+    if (t == T_TIPO_PET) return buscar_tipo_pet(*b->tipos, codigo) != NULL;
+    if (t == T_PESSOA) return buscar_pessoa(*b->pessoas, codigo) != NULL;
+    return buscar_pet(*b->pets, codigo) != NULL;
+}
 
-static void executar_insert(const char *orig, const char *l, enum tabela t, struct bancos *b) {
+static int executar_insert(const char *orig, const char *l, enum tabela t, struct bancos *b) {
     char colunas[MAX_CAMPOS][TAM], valores[MAX_CAMPOS][TAM];
     size_t pos_values = (size_t) (strstr(l, "values") - l);
     const char *a1 = strchr(orig, '(');
@@ -179,7 +252,7 @@ static void executar_insert(const char *orig, const char *l, enum tabela t, stru
     const char *f2 = strrchr(orig, ')');
     if (!a2 || !f2 || f2 < a2) {
         printf("Erro: VALUES mal formado.\n");
-        return;
+        return 0;
     }
     int nv = separar_lista(a2 + 1, (size_t) (f2 - a2 - 1), valores, MAX_CAMPOS);
     int nc;
@@ -192,7 +265,7 @@ static void executar_insert(const char *orig, const char *l, enum tabela t, stru
     }
     if (nc != nv) {
         printf("Erro: %d colunas e %d valores.\n", nc, nv);
-        return;
+        return 0;
     }
 
     struct tipo_pet tp = {0};
@@ -203,47 +276,59 @@ static void executar_insert(const char *orig, const char *l, enum tabela t, stru
     for (int i = 0; i < nc; i++) {
         if (!aplicar_campo(t, reg, colunas[i], valores[i])) {
             printf("Erro: coluna '%s' nao existe em %s.\n", colunas[i], nomes_tabela[t]);
-            return;
+            return 0;
         }
         char c[TAM];
         minusculo(c, colunas[i], sizeof c);
         tem_codigo |= !strcmp(c, "codigo");
     }
     const char *nome = t == T_TIPO_PET ? tp.nome : t == T_PESSOA ? pe.nome : pt.nome;
+    int codigo = *(int *) reg;
     if (!tem_codigo || !nome[0]) {
         printf("Erro: codigo e nome sao obrigatorios.\n");
-        return;
+        return 0;
+    }
+    if (existe(t, codigo, b)) {
+        printf("Erro: ja existe %s com codigo %d.\n", nomes_tabela[t], codigo);
+        return 0;
+    }
+    if (t == T_PET && !buscar_pessoa(*b->pessoas, pt.codigo_pessoa)) {
+        printf("Erro: dono (pessoa %d) nao cadastrado.\n", pt.codigo_pessoa);
+        return 0;
+    }
+    if (t == T_PET && !buscar_tipo_pet(*b->tipos, pt.codigo_tipo_pet)) {
+        printf("Erro: tipo de pet %d nao cadastrado.\n", pt.codigo_tipo_pet);
+        return 0;
     }
     int ok = t == T_TIPO_PET ? inserir_tipo_pet(b->tipos, &tp)
            : t == T_PESSOA   ? inserir_pessoas(b->pessoas, &pe)
                              : inserir_pet(b->pets, &pt, *b->pessoas, *b->tipos);
-    if (ok) printf("1 registro inserido em %s.\n", nomes_tabela[t]);
+    if (ok) printf("OK: %s %d inserido.\n", nomes_tabela[t], codigo);
+    return ok;
 }
 
-static void executar_update(const char *orig, const char *l, enum tabela t, int codigo, struct bancos *b) {
+static int executar_update(const char *orig, const char *l, enum tabela t, int codigo, struct bancos *b) {
     const char *ini = strstr(l, " set ") + 5;
     const char *fim = strstr(l, " where ");
     char pares[MAX_CAMPOS][TAM];
     int n = separar_lista(orig + (ini - l), (size_t) (fim - ini), pares, MAX_CAMPOS);
 
+    if (!existe(t, codigo, b)) {
+        printf("Erro: %s com codigo %d nao encontrado.\n", nomes_tabela[t], codigo);
+        return 0;
+    }
     struct tipo_pet tp;
     struct pessoa pe;
     struct pet pt;
     void *reg;
     if (t == T_TIPO_PET) {
-        struct no_tipo_pet *no = buscar_tipo_pet(*b->tipos, codigo);
-        if (!no) goto nao_achou;
-        tp = *no->dadosDoTipoPet;
+        tp = *buscar_tipo_pet(*b->tipos, codigo)->dadosDoTipoPet;
         reg = &tp;
     } else if (t == T_PESSOA) {
-        struct no_pessoa *no = buscar_pessoa(*b->pessoas, codigo);
-        if (!no) goto nao_achou;
-        pe = *no->dadosDaPessoa;
+        pe = *buscar_pessoa(*b->pessoas, codigo)->dadosDaPessoa;
         reg = &pe;
     } else {
-        struct no_pet *no = buscar_pet(*b->pets, codigo);
-        if (!no) goto nao_achou;
-        pt = *no->dadoDoPet;
+        pt = *buscar_pet(*b->pets, codigo)->dadoDoPet;
         reg = &pt;
     }
 
@@ -251,74 +336,70 @@ static void executar_update(const char *orig, const char *l, enum tabela t, int 
         char *igual = strchr(pares[i], '=');
         if (!igual) {
             printf("Erro: esperado campo = valor em '%s'.\n", pares[i]);
-            return;
+            return 0;
         }
         *igual = '\0';
         aparar(pares[i]);
         aparar(igual + 1);
         if (!aplicar_campo(t, reg, pares[i], igual + 1)) {
             printf("Erro: coluna '%s' nao existe em %s.\n", pares[i], nomes_tabela[t]);
-            return;
+            return 0;
         }
     }
-    if (*(int *) reg != codigo) { /* codigo e o primeiro campo das tres structs */
+    if (*(int *) reg != codigo) {
         printf("Erro: o codigo nao pode ser alterado.\n");
-        return;
+        return 0;
     }
-    if (t == T_PET && (!buscar_pessoa(*b->pessoas, pt.codigo_pessoa) || !buscar_tipo_pet(*b->tipos, pt.codigo_tipo_pet))) {
-        printf("Erro: pessoa ou tipo de pet inexistente.\n");
-        return;
+    if (t == T_PET && !buscar_pessoa(*b->pessoas, pt.codigo_pessoa)) {
+        printf("Erro: dono (pessoa %d) nao cadastrado.\n", pt.codigo_pessoa);
+        return 0;
+    }
+    if (t == T_PET && !buscar_tipo_pet(*b->tipos, pt.codigo_tipo_pet)) {
+        printf("Erro: tipo de pet %d nao cadastrado.\n", pt.codigo_tipo_pet);
+        return 0;
     }
     int ok = t == T_TIPO_PET ? alterar_tipo_pet(b->tipos, codigo, tp.nome)
            : t == T_PESSOA   ? alterar_pessoa(b->pessoas, codigo, &pe)
                              : alterar_pet(b->pets, codigo, &pt);
-    if (ok) printf("1 registro alterado em %s.\n", nomes_tabela[t]);
-    return;
-
-nao_achou:
-    printf("Erro: %s com codigo %d nao encontrado.\n", nomes_tabela[t], codigo);
+    if (ok) printf("OK: %s %d alterado.\n", nomes_tabela[t], codigo);
+    return ok;
 }
 
-static void executar_delete(enum tabela t, int codigo, struct bancos *b) {
-    /* nao deixa pet apontando para dono/tipo removido */
+static int executar_delete(enum tabela t, int codigo, struct bancos *b) {
+    if (!existe(t, codigo, b)) {
+        printf("Erro: %s com codigo %d nao encontrado.\n", nomes_tabela[t], codigo);
+        return 0;
+    }
     if (t != T_PET) {
         for (struct no_pet *p = *b->pets; p; p = p->prox) {
             int ref = t == T_PESSOA ? p->dadoDoPet->codigo_pessoa : p->dadoDoPet->codigo_tipo_pet;
             if (ref == codigo) {
                 printf("Erro: %s %d ainda tem pets cadastrados.\n", nomes_tabela[t], codigo);
-                return;
+                return 0;
             }
         }
     }
     int ok = t == T_TIPO_PET ? remover_tipo_pet(b->tipos, codigo)
            : t == T_PESSOA   ? remover_pessoa(b->pessoas, codigo)
                              : deletar_pet(b->pets, codigo);
-    if (ok) printf("1 registro removido de %s.\n", nomes_tabela[t]);
+    if (ok) printf("OK: %s %d removido.\n", nomes_tabela[t], codigo);
+    return ok;
 }
 
-static void executar_select(const char *l, enum tabela t, struct bancos *b) {
+static int executar_select(const char *l, enum tabela t, struct bancos *b) {
     void (*imprimir)(void *) = t == T_TIPO_PET ? imprimir_tipo_pet : t == T_PESSOA ? imprimir_pessoa : imprimir_pet;
     int codigo;
-
     int filtrar = obter_codigo_where(l, &codigo);
-    int ordenar = strstr(l, " order by ") != NULL;
-    if (filtrar && !ordenar) {
-        void *reg = NULL;
-        if (t == T_TIPO_PET) { struct no_tipo_pet *n = buscar_tipo_pet(*b->tipos, codigo); if (n) reg = n->dadosDoTipoPet; }
-        else if (t == T_PESSOA) { struct no_pessoa *n = buscar_pessoa(*b->pessoas, codigo); if (n) reg = n->dadosDaPessoa; }
-        else { struct no_pet *n = buscar_pet(*b->pets, codigo); if (n) reg = n->dadoDoPet; }
-        if (reg) imprimir(reg);
-        else printf("Nenhum registro encontrado.\n");
-        return;
-    }
-
-    /* ordena pela arvore binaria (chave = nome, ou codigo com zeros a esquerda) */
     int por_nome = strstr(l, "order by nome") != NULL;
+
+    bancos_atual = b;
+    imprimir_cabecalho(t);
+
     struct no_arvore *raiz = NULL;
     char chave[100];
 #define VISITAR(reg, cod, nome)                                          \
     do {                                                                 \
-        if (filtrar && (cod) != codigo) break;                         \
+        if (filtrar && (cod) != codigo) break;                           \
         if (por_nome) snprintf(chave, sizeof chave, "%s", nome);         \
         else snprintf(chave, sizeof chave, "%011d", (cod) + 1000000000); \
         raiz = inserir_na_arvore(raiz, chave, reg);                      \
@@ -332,12 +413,13 @@ static void executar_select(const char *l, enum tabela t, struct bancos *b) {
         for (struct no_pet *n = *b->pets; n; n = n->prox) VISITAR(n->dadoDoPet, n->dadoDoPet->codigo, n->dadoDoPet->nome);
 #undef VISITAR
 
-    if (!raiz) printf("Nenhum registro encontrado.\n");
     percorrer_em_ordem(raiz, imprimir);
     liberar_arvore(raiz);
+    imprimir_rodape();
+    return 1;
 }
 
-static void executar_comando(const char *cmd, struct bancos *b) {
+static int executar_comando(const char *cmd, struct bancos *b) {
     char orig[sizeof(((struct comando *) 0)->descricao)], l[sizeof orig];
     snprintf(orig, sizeof orig, "%s", cmd);
     normalizar_aspas(orig);
@@ -347,13 +429,13 @@ static void executar_comando(const char *cmd, struct bancos *b) {
     int codigo = 0;
     obter_codigo_where(l, &codigo);
 
-    printf("> %s\n", orig);
+    printf("\n> %s\n", orig);
     switch (op) {
-        case OP_INSERT: executar_insert(orig, l, t, b); break;
-        case OP_UPDATE: executar_update(orig, l, t, codigo, b); break;
-        case OP_DELETE: executar_delete(t, codigo, b); break;
-        case OP_SELECT: executar_select(l, t, b); break;
-        default: printf("Erro: comando invalido.\n");
+        case OP_INSERT: return executar_insert(orig, l, t, b);
+        case OP_UPDATE: return executar_update(orig, l, t, codigo, b);
+        case OP_DELETE: return executar_delete(t, codigo, b);
+        case OP_SELECT: return executar_select(l, t, b);
+        default: printf("Erro: comando invalido.\n"); return 0;
     }
 }
 
@@ -373,7 +455,7 @@ void separar_comando_por_tabela(
     }
 }
 
-void processar_filas_operacoes_especificas(
+int processar_filas_operacoes_especificas(
         struct cabeca *filaTipoPet,
         struct cabeca *filaPessoa,
         struct cabeca *filaPet,
@@ -383,6 +465,8 @@ void processar_filas_operacoes_especificas(
     struct bancos b = {listaTiposPet, listaPessoas, listaPets};
     struct cabeca *filas[] = {filaTipoPet, filaPessoa, filaPet};
     struct comando cmd;
+    int erros = 0;
     for (int i = 0; i < 3; i++)
-        while (desenfileirar(filas[i], &cmd)) executar_comando(cmd.descricao, &b);
+        while (desenfileirar(filas[i], &cmd)) erros += !executar_comando(cmd.descricao, &b);
+    return erros;
 }

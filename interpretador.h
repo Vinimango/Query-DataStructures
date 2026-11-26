@@ -16,7 +16,7 @@ void separar_comando_por_tabela(
     struct cabeca *filaComandosPessoa,
     struct cabeca *filaComandosPet);
 
-void processar_filas_operacoes_especificas(
+int processar_filas_operacoes_especificas(
         struct cabeca *filaTipoPet,
         struct cabeca *filaPessoa,
         struct cabeca *filaPet,
@@ -25,4 +25,4 @@ void processar_filas_operacoes_especificas(
         struct no_pet **listaPets);
 
 
-#endif //QUERY_DATASTRUCTURES_INTERPRETADOR_H
+#endif

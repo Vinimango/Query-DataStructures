@@ -16,7 +16,8 @@ struct no_pet *carregar_pet( const char *nome_arquivo, struct no_pessoa *listaPe
     struct pet temp;
 
     while (fread(&temp, sizeof(struct pet), 1, arquivo) == 1) {
-        inserir_pet(&listaPets, &temp, listaPessoas, listaTipoPet);
+        if (!inserir_pet(&listaPets, &temp, listaPessoas, listaTipoPet))
+            printf("Aviso: pet %d ignorado ao carregar (dono/tipo inexistente ou codigo repetido).\n", temp.codigo);
     }
     fclose(arquivo);
     return listaPets;
@@ -42,7 +43,6 @@ struct no_pet *buscar_pet(struct no_pet *listaPets, int codigo) {
         aux = aux->prox;
     }
     if (!aux) {
-        printf("Não foi possivel encontrar um pet com esse codigo!\n");
         return NULL;
     }
     return aux;
@@ -50,36 +50,36 @@ struct no_pet *buscar_pet(struct no_pet *listaPets, int codigo) {
 
 int inserir_pet(struct no_pet **listaPets, struct pet *dadosDoPet, struct no_pessoa *listaPessoas, struct no_tipo_pet *listaTipoPet) {
     if (buscar_pet(*listaPets, dadosDoPet->codigo) != NULL) {
-        printf("Já existe um pet com esse codigo");
         return 0;
     }
     if (buscar_pessoa(listaPessoas, dadosDoPet->codigo_pessoa) == NULL) {
-        printf("Erro: Pessoa (dono) nao encontrada.\n");
         return 0;
     }
     if (buscar_tipo_pet(listaTipoPet, dadosDoPet->codigo_tipo_pet) == NULL) {
-        printf("Erro: Tipo de pet nao encontrado.\n");
         return 0;
     }
     struct no_pet *novo = (struct no_pet *) malloc(sizeof(struct no_pet));
     if (!novo) {
-        printf("Erro ao alocar memoria");
+        printf("Erro ao alocar memoria!\n");
         return 0;
     }
     novo->dadoDoPet = (struct pet *) malloc(sizeof(struct pet));
     if (novo->dadoDoPet == NULL) {
-        printf("Erro ao alocar memoria");
+        printf("Erro ao alocar memoria!\n");
         free(novo);
         return 0;
     }
     *(novo->dadoDoPet) = *dadosDoPet;
+    novo->prox = NULL;
     novo->ant = NULL;
-    novo->prox = *listaPets;
-
-    if (*listaPets) {
-        (*listaPets)->ant = novo;
+    if (!*listaPets) {
+        *listaPets = novo;
+        return 1;
     }
-    *listaPets = novo;
+    struct no_pet *ult = *listaPets;
+    while (ult->prox) ult = ult->prox;
+    ult->prox = novo;
+    novo->ant = ult;
     return 1;
 
 
@@ -91,7 +91,6 @@ int alterar_pet(struct no_pet **listaPets, int codigo, struct pet *dadosDoPet) {
         aux = aux->prox;
     }
     if (!aux) {
-        printf("Nao foi possivel alterar um pet com esse codigo!\n");
         return 0;
     }
     *(aux->dadoDoPet) = *dadosDoPet;
@@ -104,7 +103,6 @@ int deletar_pet(struct no_pet **listaPets, int codigo) {
         aux = aux->prox;
     }
     if (!aux) {
-        printf("Nao foi possivel remover este pet!\n");
         return 0;
     }
     if (aux == *listaPets) {

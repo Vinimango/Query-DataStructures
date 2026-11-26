@@ -1,8 +1,14 @@
 #include "interpretador.h"
 #include <stdio.h>
 #include <string.h>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 int main(int argc, char **argv) {
+#ifdef _WIN32
+    SetConsoleOutputCP(CP_UTF8);
+#endif
     struct no_tipo_pet *tipos = carregar_tipos_pet("tipos_pet.dat");
     struct no_pessoa *pessoas = carregar_pessoas("pessoas.dat");
     struct no_pet *pets = carregar_pet("pets.dat", pessoas, tipos);
@@ -22,15 +28,20 @@ int main(int argc, char **argv) {
     struct comando cmd;
     size_t n = 0;
     char aspa = 0;
-    int ch;
+    int ch, validos = 0, invalidos = 0;
     do {
         ch = fgetc(in);
         if (ch == EOF || (ch == ';' && !aspa)) {
             cmd.descricao[n] = '\0';
             n = 0;
             if (strspn(cmd.descricao, " ") == strlen(cmd.descricao)) continue;
-            if (validar_comando(cmd.descricao)) enfileirar(&fila, &cmd);
-            else printf("Comando invalido: %s\n", cmd.descricao);
+            if (validar_comando(cmd.descricao)) {
+                enfileirar(&fila, &cmd);
+                validos++;
+            } else {
+                printf("Comando invalido: %s\n", cmd.descricao);
+                invalidos++;
+            }
             continue;
         }
         if (aspa ? ch == aspa : (ch == '\'' || ch == '"')) aspa = aspa ? 0 : (char) ch;
@@ -39,7 +50,11 @@ int main(int argc, char **argv) {
     if (in != stdin) fclose(in);
 
     separar_comando_por_tabela(&fila, &filaTipo, &filaPessoa, &filaPet);
-    processar_filas_operacoes_especificas(&filaTipo, &filaPessoa, &filaPet, &tipos, &pessoas, &pets);
+    int erros = processar_filas_operacoes_especificas(&filaTipo, &filaPessoa, &filaPet, &tipos, &pessoas, &pets);
+
+    printf("\n========================================\n");
+    printf("%d comandos: %d executados, %d com erro, %d invalidos\n",
+           validos + invalidos, validos - erros, erros, invalidos);
 
     salvar_tipos_pet(tipos, "tipos_pet.dat");
     salvar_pessoas(pessoas, "pessoas.dat");
