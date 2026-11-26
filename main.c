@@ -19,7 +19,6 @@ int main(int argc, char **argv) {
     inicializar(&filaPessoa);
     inicializar(&filaPet);
 
-    /* comandos separados por ';' (fora de aspas) */
     struct comando cmd;
     size_t n = 0;
     char aspa = 0;
