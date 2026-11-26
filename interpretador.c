@@ -5,15 +5,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-/*
- * SQL suportado (tabelas: tipo_pet, pessoa, pet):
- *   INSERT INTO pessoa (codigo, nome) VALUES (1, 'Ana');
- *   INSERT INTO tipo_pet VALUES (1, 'Cachorro');          -- colunas na ordem da struct
- *   UPDATE pessoa SET nome = 'Bia', telefone = '99' WHERE codigo = 1;
- *   DELETE FROM pet WHERE codigo = 3;
- *   SELECT * FROM pessoa [WHERE codigo = 1] [ORDER BY nome|codigo];
- */
-
 #define MAX_CAMPOS 8
 #define TAM 128
 
@@ -49,7 +40,6 @@ static void normalizar_aspas(char *s) {
     *w = '\0';
 }
 
-/* remove espacos nas pontas e aspas em volta */
 static void aparar(char *s) {
     char *ini = s;
     while (isspace((unsigned char) *ini)) ini++;
@@ -63,7 +53,6 @@ static void aparar(char *s) {
     s[n] = '\0';
 }
 
-/* divide s[0..len) por virgulas fora de aspas */
 static int separar_lista(const char *s, size_t len, char out[][TAM], int max) {
     int k = 0;
     size_t j = 0;
@@ -131,7 +120,6 @@ int validar_comando(const char *descricao_comando) {
     }
 }
 
-/* ---------- campos ---------- */
 
 static int aplicar_campo(enum tabela t, void *reg, const char *campo, const char *v) {
     char c[TAM];
@@ -176,7 +164,6 @@ static void imprimir_pet(void *r) {
     printf("%d | %s | pessoa %d | tipo %d\n", p->codigo, p->nome, p->codigo_pessoa, p->codigo_tipo_pet);
 }
 
-/* ---------- execucao ---------- */
 
 struct bancos {
     struct no_tipo_pet **tipos;
@@ -386,7 +373,6 @@ void separar_comando_por_tabela(
     }
 }
 
-/* ordem tipo_pet -> pessoa -> pet: um pet so entra depois do dono e do tipo */
 void processar_filas_operacoes_especificas(
         struct cabeca *filaTipoPet,
         struct cabeca *filaPessoa,
