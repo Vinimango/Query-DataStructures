@@ -14,7 +14,8 @@ struct no_pessoa *carregar_pessoas(const char *nome_arquivo) {
     struct pessoa temp;
 
     while (fread(&temp, sizeof(struct pessoa) ,1 ,arquivo ) == 1) {
-        inserir_pessoas(&lista_pessoas, &temp);
+        if (!inserir_pessoas(&lista_pessoas, &temp))
+            printf("Aviso: pessoa %d ignorada ao carregar (codigo repetido).\n", temp.codigo);
     }
     fclose(arquivo);
     return lista_pessoas;
@@ -50,7 +51,6 @@ struct no_pessoa *buscar_pessoa(struct no_pessoa *lista_pessoas, int codigo) {
 
 int inserir_pessoas(struct no_pessoa **lista_pessoas, struct pessoa *pessoa) {
     if (buscar_pessoa(*lista_pessoas, pessoa->codigo) != NULL) {
-        printf("Erro: Codigo %d ja cadastrado!\n", pessoa->codigo);
         return 0;
     }
     struct no_pessoa *novo = (struct no_pessoa *) malloc(sizeof(struct no_pessoa));
@@ -64,12 +64,16 @@ int inserir_pessoas(struct no_pessoa **lista_pessoas, struct pessoa *pessoa) {
         return 0;
     }
     *(novo->dadosDaPessoa) = *pessoa;
+    novo->prox = NULL;
     novo->ant = NULL;
-    novo->prox = *lista_pessoas;
-    if (*lista_pessoas) {
-        (*lista_pessoas)->ant = novo;
+    if (!*lista_pessoas) {
+        *lista_pessoas = novo;
+        return 1;
     }
-    *lista_pessoas = novo;
+    struct no_pessoa *ult = *lista_pessoas;
+    while (ult->prox) ult = ult->prox;
+    ult->prox = novo;
+    novo->ant = ult;
     return 1;
 }
 
@@ -79,7 +83,6 @@ int alterar_pessoa(struct no_pessoa **lista_pessoas, int codigo, struct pessoa *
         aux = aux->prox;
     }
     if (!aux) {
-        printf("Não foi possivel encontrar uma pessoa com este código!\n");
         return 0;
     }
     *(aux->dadosDaPessoa) = *pessoa;
@@ -92,7 +95,6 @@ int remover_pessoa(struct no_pessoa **lista_pessoas, int codigo) {
         aux = aux->prox;
     }
     if (!aux) {
-        printf("Não foi possivel remover esta pessoa!\n");
         return 0;
     }
     if (aux == *lista_pessoas) {

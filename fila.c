@@ -20,12 +20,12 @@ int fila_vazia(struct cabeca *c) {
 int enfileirar(struct cabeca *c, struct comando *cmd) {
     struct no_fila *novo = (struct no_fila*) malloc(sizeof(struct no_fila));
     if (!novo) {
-        printf("Erro ao alocar memoria");
+        printf("Erro ao alocar memoria!\n");
         return 0;
     }
     novo->comando = (struct comando*) malloc(sizeof(struct comando));
     if (!novo->comando) {
-        printf("Erro ao alocar memoria");
+        printf("Erro ao alocar memoria!\n");
         free(novo);
         return 0;
     }
